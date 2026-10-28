@@ -8,6 +8,7 @@
     "build.watch": "tsc --build --watch",
     "worker": "tsx src/worker.ts",
     "start-workflow": "tsx src/client.ts",
+    "start-worker-demo": "tsx src/start-worker-demo.ts",
     "signal-approve": "tsx src/signal-approve.ts",
     "mcp": "tsx src/mcp/server.ts",
     "lint": "tsc --noEmit"

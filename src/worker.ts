@@ -1,9 +1,11 @@
+import os from 'node:os';
 import { NativeConnection, Worker } from '@temporalio/worker';
 import * as activities from './activities';
 import { TASK_QUEUE, temporalCloudConfig } from './shared';
 
 async function run(): Promise<void> {
   const { namespace, connectionOptions } = temporalCloudConfig();
+  const workerLabel = process.env.WORKER_LABEL?.trim();
 
   const connection = await NativeConnection.connect(connectionOptions);
 
@@ -17,7 +19,14 @@ async function run(): Promise<void> {
     });
 
     console.log(
-      `Worker polling task queue "${TASK_QUEUE}" on namespace "${namespace}"…`,
+      `Worker polling task queue "${TASK_QUEUE}" on namespace "${namespace}"`,
+    );
+    console.log(
+      `  identity: host=${os.hostname()} pid=${process.pid}` +
+        (workerLabel ? ` label=${workerLabel}` : ''),
+    );
+    console.log(
+      '  tip: start a second worker (optionally WORKER_LABEL=B) to see activity fan-out',
     );
     await worker.run();
   } finally {
