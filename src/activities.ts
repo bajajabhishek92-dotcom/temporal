@@ -1,4 +1,5 @@
-import { log } from '@temporalio/activity';
+import { Context, log } from '@temporalio/activity';
+import os from 'node:os';
 
 export interface ResearchBrief {
   topic: string;
@@ -6,11 +7,72 @@ export interface ResearchBrief {
   sources: string[];
 }
 
+/** Identity of the worker process that executed an activity. */
+export interface WorkerIdentity {
+  step: number;
+  hostname: string;
+  pid: number;
+  taskQueue: string;
+  timestamp: string;
+  /** Optional label from WORKER_LABEL env — useful when two workers share a host. */
+  workerLabel?: string;
+}
+
+export interface ReportWorkerIdentityInput {
+  step: number;
+  /** Simulated work duration so you can kill a worker mid-activity. */
+  workMs?: number;
+}
+
 export interface AgentSummary {
   topic: string;
   summary: string;
   mode: 'openai' | 'stub';
   model?: string;
+}
+
+/**
+ * Logs and returns which worker process ran this activity.
+ * Run two workers on the same task queue to see different pid/hostname values.
+ */
+export async function reportWorkerIdentity(
+  input: ReportWorkerIdentityInput,
+): Promise<WorkerIdentity> {
+  const workMs = Math.max(0, input.workMs ?? 2000);
+  const info = Context.current().info;
+  const workerLabel = process.env.WORKER_LABEL?.trim() || undefined;
+
+  const identity: WorkerIdentity = {
+    step: input.step,
+    hostname: os.hostname(),
+    pid: process.pid,
+    taskQueue: info.taskQueue,
+    timestamp: new Date().toISOString(),
+    workerLabel,
+  };
+
+  log.info('Activity running on worker', {
+    step: identity.step,
+    hostname: identity.hostname,
+    pid: identity.pid,
+    taskQueue: identity.taskQueue,
+    workerLabel,
+  });
+  console.log(
+    `[reportWorkerIdentity] step=${identity.step}` +
+      ` host=${identity.hostname} pid=${identity.pid}` +
+      ` queue=${identity.taskQueue}` +
+      (workerLabel ? ` label=${workerLabel}` : '') +
+      ` workMs=${workMs}`,
+  );
+
+  if (workMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, workMs));
+  }
+
+  // Re-stamp after work so the returned time reflects completion on this process.
+  identity.timestamp = new Date().toISOString();
+  return identity;
 }
 
 /** Simulated research step — durable because Temporal retries the activity on failure. */
