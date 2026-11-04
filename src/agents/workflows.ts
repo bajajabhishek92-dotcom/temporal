@@ -1,6 +1,7 @@
 import { Agent } from '@openai/agents-core';
 import { TemporalOpenAIRunner, activityAsTool } from '@temporalio/openai-agents/workflow';
 import type * as activities from './activities';
+import { DEFAULT_GEMINI_MODEL } from './model';
 
 /**
  * First durable Temporal Agent example (Gemini via OpenAI Agents + Temporal).
@@ -50,7 +51,8 @@ export async function durableTemporalAgent(prompt: string): Promise<string> {
   );
 
   // Model name must be a string; Worker’s Gemini OpenAIProvider resolves it.
-  // Override at runtime with runConfig.model / GEMINI_MODEL on the Worker default path.
+  // Default is Gemini 3.8 Flash (`gemini-3.8-flash`). Override via GEMINI_MODEL
+  // only affects Worker-side helpers; this Workflow pins the official model id.
   const agent = new Agent({
     name: 'TemporalShowcaseAgent',
     instructions: [
@@ -59,14 +61,14 @@ export async function durableTemporalAgent(prompt: string): Promise<string> {
       'Explain that agents are Workflows: the loop is durable; model/tool I/O runs as Activities on Workers you run.',
       'Keep answers short (a few sentences) unless asked for more detail.',
     ].join(' '),
-    model: 'gemini-2.5-flash',
+    model: DEFAULT_GEMINI_MODEL,
     tools: [lookupTool, namespaceTool],
   });
 
   const result = await new TemporalOpenAIRunner().run(agent, prompt, {
     runConfig: {
       // Keep model as a name string so the Worker provider can resolve Gemini.
-      model: 'gemini-2.5-flash',
+      model: DEFAULT_GEMINI_MODEL,
     },
   });
   return result.finalOutput ?? '';

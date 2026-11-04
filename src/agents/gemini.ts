@@ -1,11 +1,11 @@
 import { OpenAIProvider } from '@openai/agents-openai';
+import { DEFAULT_GEMINI_MODEL } from './model';
+
+export { DEFAULT_GEMINI_MODEL } from './model';
 
 /** Gemini OpenAI-compatible Chat Completions endpoint. */
 export const GEMINI_OPENAI_BASE_URL =
   'https://generativelanguage.googleapis.com/v1beta/openai/';
-
-/** Default Gemini model for the durable agent. Override with GEMINI_MODEL. */
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 
 /**
  * Prefer GEMINI_API_KEY (Gemini OpenAI-compat docs); accept GOOGLE_API_KEY

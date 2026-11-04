@@ -103,7 +103,7 @@ export async function researchTopic(topic: string): Promise<ResearchBrief> {
 export async function summarizeFindings(brief: ResearchBrief): Promise<AgentSummary> {
   const apiKey =
     process.env.GEMINI_API_KEY?.trim() || process.env.GOOGLE_API_KEY?.trim();
-  const model = process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash';
+  const model = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
 
   if (!apiKey) {
     log.info('GEMINI_API_KEY / GOOGLE_API_KEY not set — using stub summary');
