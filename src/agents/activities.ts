@@ -45,7 +45,7 @@ const CONCEPTS: Array<{
     keys: ['agent', 'agents', 'openai agents'],
     matched: 'Durable AI agent',
     summary:
-      'With @temporalio/openai-agents, the agent loop runs in a Workflow while each model call (and MCP/sandbox op) runs as a retryable Activity via OpenAIAgentsPlugin.',
+      'With @temporalio/openai-agents, the agent loop runs in a Workflow while each model call (and MCP/sandbox op) runs as a retryable Activity via OpenAIAgentsPlugin. This showcase points the provider at Gemini’s OpenAI-compatible API.',
     docsUrl: 'https://docs.temporal.io/develop/typescript/integrations/openai-agents',
   },
   {

@@ -1,6 +1,9 @@
 import { Client, Connection } from '@temporalio/client';
 import { OpenAIAgentsPlugin } from '@temporalio/openai-agents';
-import { OpenAIProvider } from '@openai/agents-openai';
+import {
+  createGeminiModelProvider,
+  resolveGeminiApiKey,
+} from './gemini';
 import { AGENTS_TASK_QUEUE, temporalCloudConfig } from '../shared';
 import { durableTemporalAgent } from './workflows';
 
@@ -18,7 +21,7 @@ function argValue(flag: string): string | undefined {
 async function run(): Promise<void> {
   const { namespace, connectionOptions } = temporalCloudConfig();
   // Client plugin needs a ModelProvider instance but does not invoke it.
-  const clientApiKey = process.env.OPENAI_API_KEY?.trim() || 'unused-on-client';
+  const clientApiKey = resolveGeminiApiKey() || 'unused-on-client';
 
   const prompt =
     argValue('--prompt') ??
@@ -33,7 +36,7 @@ async function run(): Promise<void> {
     namespace,
     plugins: [
       new OpenAIAgentsPlugin({
-        modelProvider: new OpenAIProvider({ apiKey: clientApiKey }),
+        modelProvider: createGeminiModelProvider(clientApiKey),
         modelParams: { useLocalActivity: true },
       }),
     ],

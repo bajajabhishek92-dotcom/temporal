@@ -1,16 +1,16 @@
 import os from 'node:os';
 import { NativeConnection, Worker } from '@temporalio/worker';
 import { OpenAIAgentsPlugin } from '@temporalio/openai-agents';
-import { OpenAIProvider } from '@openai/agents-openai';
 import * as activities from './activities';
-import { AGENTS_TASK_QUEUE, requireEnv, temporalCloudConfig } from '../shared';
+import { createGeminiModelProvider, requireGeminiApiKey } from './gemini';
+import { AGENTS_TASK_QUEUE, temporalCloudConfig } from '../shared';
 
 /**
- * Worker for durable OpenAI Agents workflows.
- * Requires OPENAI_API_KEY — model calls run as Activities via OpenAIAgentsPlugin.
+ * Worker for durable Temporal Agents (Gemini via OpenAI-compatible API).
+ * Requires GEMINI_API_KEY or GOOGLE_API_KEY — model calls run as Activities.
  */
 async function run(): Promise<void> {
-  const apiKey = requireEnv('OPENAI_API_KEY');
+  const apiKey = requireGeminiApiKey();
   const { namespace, connectionOptions } = temporalCloudConfig();
   const workerLabel = process.env.WORKER_LABEL?.trim();
 
@@ -25,7 +25,7 @@ async function run(): Promise<void> {
       activities,
       plugins: [
         new OpenAIAgentsPlugin({
-          modelProvider: new OpenAIProvider({ apiKey }),
+          modelProvider: createGeminiModelProvider(apiKey),
           // Local Activities keep short model calls on the same Worker process.
           modelParams: { useLocalActivity: true },
         }),
@@ -49,6 +49,7 @@ async function run(): Promise<void> {
       `  identity: host=${os.hostname()} pid=${process.pid}` +
         (workerLabel ? ` label=${workerLabel}` : ''),
     );
+    console.log('  model provider: Gemini (OpenAI-compatible endpoint)');
     console.log(
       `  Cloud Agents UI: https://cloud.temporal.io/namespaces/${namespace}/agents`,
     );

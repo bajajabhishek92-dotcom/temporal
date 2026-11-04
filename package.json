@@ -1,7 +1,7 @@
 {
   "name": "temporal-showcase",
   "version": "1.0.0",
-  "description": "Temporal Cloud showcase: workflows, workers, durable OpenAI Agents, and an MCP server",
+  "description": "Temporal Cloud showcase: workflows, workers, durable Gemini agents, and an MCP server",
   "private": true,
   "scripts": {
     "build": "tsc --build",

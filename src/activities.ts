@@ -27,7 +27,7 @@ export interface ReportWorkerIdentityInput {
 export interface AgentSummary {
   topic: string;
   summary: string;
-  mode: 'openai' | 'stub';
+  mode: 'gemini' | 'stub';
   model?: string;
 }
 
@@ -97,15 +97,16 @@ export async function researchTopic(topic: string): Promise<ResearchBrief> {
 }
 
 /**
- * Lightweight “agent” summarization activity.
- * Uses OpenAI when OPENAI_API_KEY is set; otherwise returns a deterministic stub.
+ * Lightweight summarization activity (not a full agent loop).
+ * Uses Gemini when GEMINI_API_KEY or GOOGLE_API_KEY is set; otherwise a stub.
  */
 export async function summarizeFindings(brief: ResearchBrief): Promise<AgentSummary> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  const model = process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
+  const apiKey =
+    process.env.GEMINI_API_KEY?.trim() || process.env.GOOGLE_API_KEY?.trim();
+  const model = process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash';
 
   if (!apiKey) {
-    log.info('OPENAI_API_KEY not set — using stub summary');
+    log.info('GEMINI_API_KEY / GOOGLE_API_KEY not set — using stub summary');
     return {
       topic: brief.topic,
       mode: 'stub',
@@ -113,12 +114,12 @@ export async function summarizeFindings(brief: ResearchBrief): Promise<AgentSumm
         `Stub agent summary for “${brief.topic}”:`,
         ...brief.bullets.map((b) => `• ${b}`),
         '',
-        'Set OPENAI_API_KEY to replace this stub with a live model call.',
+        'Set GEMINI_API_KEY (or GOOGLE_API_KEY) to replace this stub with a live Gemini call.',
       ].join('\n'),
     };
   }
 
-  log.info('Calling OpenAI for summary', { model, topic: brief.topic });
+  log.info('Calling Gemini for summary', { model, topic: brief.topic });
 
   const prompt = [
     `Summarize the following research brief on “${brief.topic}” in 3 short paragraphs for engineers new to Temporal.`,
@@ -130,28 +131,31 @@ export async function summarizeFindings(brief: ResearchBrief): Promise<AgentSumm
     ...brief.sources.map((s) => `- ${s}`),
   ].join('\n');
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
+  const response = await fetch(
+    'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.3,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a concise technical writer explaining Temporal to colleagues.',
+          },
+          { role: 'user', content: prompt },
+        ],
+      }),
     },
-    body: JSON.stringify({
-      model,
-      temperature: 0.3,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a concise technical writer explaining Temporal to colleagues.',
-        },
-        { role: 'user', content: prompt },
-      ],
-    }),
-  });
+  );
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`OpenAI request failed (${response.status}): ${body.slice(0, 500)}`);
+    throw new Error(`Gemini request failed (${response.status}): ${body.slice(0, 500)}`);
   }
 
   const data = (await response.json()) as {
@@ -159,13 +163,13 @@ export async function summarizeFindings(brief: ResearchBrief): Promise<AgentSumm
   };
   const summary = data.choices?.[0]?.message?.content?.trim();
   if (!summary) {
-    throw new Error('OpenAI response missing summary content');
+    throw new Error('Gemini response missing summary content');
   }
 
   return {
     topic: brief.topic,
     summary,
-    mode: 'openai',
+    mode: 'gemini',
     model,
   };
 }

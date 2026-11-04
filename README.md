@@ -7,8 +7,8 @@ A small TypeScript demo for colleagues covering:
 - Activities with retries
 - Durable timers (`sleep`)
 - Signals & queries
-- A **durable Temporal Agent** via the official OpenAI Agents SDK integration (`@temporalio/openai-agents`)
-- A lightweight summarize activity (OpenAI or stub) — not a full agent loop
+- A **durable Temporal Agent** via `@temporalio/openai-agents` with **Gemini** as the model provider
+- A lightweight summarize activity (Gemini or stub) — not a full agent loop
 - An MCP server (stdio) that lists / describes / starts demo workflows
 
 **Target namespace:** `quickstart-abhishek-b8746e8b.jftpi`
@@ -21,13 +21,13 @@ https://cloud.temporal.io/namespaces/quickstart-abhishek-b8746e8b.jftpi/agents
 - Node.js 20+
 - A Temporal Cloud API key for the namespace above
 - The API-key gRPC endpoint for your region (Cloud UI → Namespace → Endpoints), e.g. `us-west-2.aws.api.temporal.io:7233`
-- An OpenAI API key for the durable agent example (`npm run agent-worker`)
+- A **Gemini** API key from [Google AI Studio](https://aistudio.google.com/apikey) for the durable agent (`npm run agent-worker`)
 
 ## Setup
 
 ```bash
 cp .env.example .env
-# edit .env — set TEMPORAL_ADDRESS, TEMPORAL_API_KEY, and OPENAI_API_KEY (for agents)
+# edit .env — set TEMPORAL_ADDRESS, TEMPORAL_API_KEY, and GEMINI_API_KEY (for agents)
 npm install
 ```
 
@@ -40,29 +40,32 @@ npm install
 | `TEMPORAL_API_KEY` | yes | Temporal Cloud API key |
 | `TEMPORAL_TASK_QUEUE` | no | Defaults to `showcase` |
 | `TEMPORAL_AGENTS_TASK_QUEUE` | no | Defaults to `showcase-agents` |
-| `OPENAI_API_KEY` | for agents | Required by `agent-worker`. Also enables live `summarizeFindings`; otherwise that activity stubs |
-| `OPENAI_MODEL` | no | Defaults to `gpt-4o-mini` (summarize activity) |
+| `GEMINI_API_KEY` | for agents | Required by `agent-worker`. Prefer this name; `GOOGLE_API_KEY` is an accepted alias |
+| `GOOGLE_API_KEY` | alias | Same Google AI Studio key if you already export this name |
+| `GEMINI_MODEL` | no | Defaults to `gemini-2.5-flash` |
 
 Do not commit `.env` or secrets.
 
-## Temporal Agents (OpenAI Agents SDK)
+## Temporal Agents (Gemini)
 
-Temporal does **not** run your agent code inside Cloud. A durable agent is a **Workflow**: the agent loop / tool selection stays in the Workflow; each **model call** and I/O **tool** runs as a retryable **Activity** on a Worker you operate. This repo follows the official TypeScript integration:
-[OpenAI Agents SDK + Temporal](https://docs.temporal.io/develop/typescript/integrations/openai-agents).
+Temporal does **not** run your agent code inside Cloud. A durable agent is a **Workflow**: the agent loop / tool selection stays in the Workflow; each **model call** and I/O **tool** runs as a retryable **Activity** on a Worker you operate.
 
-### What you configure in Temporal Cloud
+This repo uses the official TypeScript agent integration ([`@temporalio/openai-agents`](https://docs.temporal.io/develop/typescript/integrations/openai-agents)) and points `OpenAIProvider` at **Gemini’s OpenAI-compatible endpoint** ([docs](https://ai.google.dev/gemini-api/docs/openai)) with `useResponses: false` (Chat Completions).
+
+### What you configure in Temporal Cloud + Gemini
 
 1. Open the namespace → create an **API key** (Settings / API Keys) with access to `quickstart-abhishek-b8746e8b.jftpi`.
 2. Copy the region **API-key gRPC endpoint** (Namespace → Endpoints) into `TEMPORAL_ADDRESS`.
-3. Put the key in `TEMPORAL_API_KEY` (local `.env` only).
+3. Put the Temporal key in `TEMPORAL_API_KEY` (local `.env` only).
 4. There is no Cloud form that deploys agent code for you — you run `npm run agent-worker` locally (or on your infra).
-5. Configure your **model provider** on that Worker: set `OPENAI_API_KEY` for the default `OpenAIProvider`. Credentials stay on the Worker; do not put them in Workflow input.
+5. On that Worker, set **`GEMINI_API_KEY`** (or `GOOGLE_API_KEY`). Credentials stay on the Worker; do not put them in Workflow input.
 
 ### Create / run the first agent
 
 Terminal 1 — agent Worker (must stay running):
 
 ```bash
+# .env must include TEMPORAL_* and GEMINI_API_KEY (or GOOGLE_API_KEY)
 npm run agent-worker
 ```
 
@@ -74,7 +77,7 @@ npm run start-agent -- --prompt "What is a Temporal Activity? Also tell me our C
 
 Optional: `--id my-agent-run-1` to pick the Workflow Id.
 
-The Workflow uses `TemporalOpenAIRunner` with two Activity tools:
+The Workflow uses `TemporalOpenAIRunner` with Gemini (`gemini-2.5-flash` by default) and two Activity tools:
 
 - `lookupTemporalConcept` — curated Temporal concept summary + docs link
 - `getShowcaseNamespaceInfo` — namespace, agents task queue, Cloud Agents UI URL
@@ -126,7 +129,7 @@ npx tsx src/signal-approve.ts <workflowId>
 1. **`researchTopic` activity** — simulated research with Temporal retries
 2. **`sleep('3 seconds')`** — durable timer
 3. **`approve` signal** (optional) — gate before summarization; **`getStatus` query** while running
-4. **`summarizeFindings` activity** — stub agent summary, or OpenAI when `OPENAI_API_KEY` is set
+4. **`summarizeFindings` activity** — stub summary, or Gemini when `GEMINI_API_KEY` / `GOOGLE_API_KEY` is set
 
 ## MCP server (Cursor)
 
@@ -257,7 +260,8 @@ src/
   shared.ts             # Cloud connection helpers
   agents/
     activities.ts       # lookupTemporalConcept + getShowcaseNamespaceInfo tools
-    workflows.ts        # durableTemporalAgent (TemporalOpenAIRunner)
+    gemini.ts           # GEMINI_API_KEY helper + OpenAIProvider → Gemini
+    workflows.ts        # durableTemporalAgent (TemporalOpenAIRunner + Gemini)
     worker.ts           # OpenAIAgentsPlugin worker on showcase-agents
     client.ts           # CLI: start durableTemporalAgent
   mcp/server.ts         # MCP stdio server

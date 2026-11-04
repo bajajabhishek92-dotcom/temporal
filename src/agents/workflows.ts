@@ -3,14 +3,16 @@ import { TemporalOpenAIRunner, activityAsTool } from '@temporalio/openai-agents/
 import type * as activities from './activities';
 
 /**
- * First durable Temporal Agent example (OpenAI Agents SDK + Temporal).
+ * First durable Temporal Agent example (Gemini via OpenAI Agents + Temporal).
  *
  * Official pattern:
  * - Agent loop / tool selection runs inside the Workflow (deterministic)
  * - Model calls run as Activities via OpenAIAgentsPlugin on the Worker
+ *   (Worker points OpenAIProvider at Gemini’s OpenAI-compatible endpoint)
  * - I/O tools use activityAsTool so they are durable Activities
  *
  * @see https://docs.temporal.io/develop/typescript/integrations/openai-agents
+ * @see https://ai.google.dev/gemini-api/docs/openai
  */
 export async function durableTemporalAgent(prompt: string): Promise<string> {
   const lookupTool = activityAsTool<typeof activities.lookupTemporalConcept>(
@@ -47,6 +49,8 @@ export async function durableTemporalAgent(prompt: string): Promise<string> {
     { startToCloseTimeout: '30 seconds' },
   );
 
+  // Model name must be a string; Worker’s Gemini OpenAIProvider resolves it.
+  // Override at runtime with runConfig.model / GEMINI_MODEL on the Worker default path.
   const agent = new Agent({
     name: 'TemporalShowcaseAgent',
     instructions: [
@@ -55,10 +59,15 @@ export async function durableTemporalAgent(prompt: string): Promise<string> {
       'Explain that agents are Workflows: the loop is durable; model/tool I/O runs as Activities on Workers you run.',
       'Keep answers short (a few sentences) unless asked for more detail.',
     ].join(' '),
-    model: 'gpt-4o-mini',
+    model: 'gemini-2.5-flash',
     tools: [lookupTool, namespaceTool],
   });
 
-  const result = await new TemporalOpenAIRunner().run(agent, prompt);
+  const result = await new TemporalOpenAIRunner().run(agent, prompt, {
+    runConfig: {
+      // Keep model as a name string so the Worker provider can resolve Gemini.
+      model: 'gemini-2.5-flash',
+    },
+  });
   return result.finalOutput ?? '';
 }
