@@ -2,6 +2,10 @@ import 'dotenv/config';
 
 export const TASK_QUEUE = process.env.TEMPORAL_TASK_QUEUE ?? 'showcase';
 
+/** Task queue for OpenAI Agents SDK durable agent workflows. */
+export const AGENTS_TASK_QUEUE =
+  process.env.TEMPORAL_AGENTS_TASK_QUEUE ?? 'showcase-agents';
+
 export function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) {
