@@ -7,22 +7,27 @@ A small TypeScript demo for colleagues covering:
 - Activities with retries
 - Durable timers (`sleep`)
 - Signals & queries
-- A lightweight durable “agent” activity (OpenAI or stub)
+- A **durable Temporal Agent** via the official OpenAI Agents SDK integration (`@temporalio/openai-agents`)
+- A lightweight summarize activity (OpenAI or stub) — not a full agent loop
 - An MCP server (stdio) that lists / describes / starts demo workflows
 
 **Target namespace:** `quickstart-abhishek-b8746e8b.jftpi`
+
+**Cloud Agents UI:**
+https://cloud.temporal.io/namespaces/quickstart-abhishek-b8746e8b.jftpi/agents
 
 ## Prerequisites
 
 - Node.js 20+
 - A Temporal Cloud API key for the namespace above
 - The API-key gRPC endpoint for your region (Cloud UI → Namespace → Endpoints), e.g. `us-west-2.aws.api.temporal.io:7233`
+- An OpenAI API key for the durable agent example (`npm run agent-worker`)
 
 ## Setup
 
 ```bash
 cp .env.example .env
-# edit .env — set TEMPORAL_ADDRESS and TEMPORAL_API_KEY
+# edit .env — set TEMPORAL_ADDRESS, TEMPORAL_API_KEY, and OPENAI_API_KEY (for agents)
 npm install
 ```
 
@@ -34,10 +39,54 @@ npm install
 | `TEMPORAL_NAMESPACE` | yes | Default in `.env.example`: `quickstart-abhishek-b8746e8b.jftpi` |
 | `TEMPORAL_API_KEY` | yes | Temporal Cloud API key |
 | `TEMPORAL_TASK_QUEUE` | no | Defaults to `showcase` |
-| `OPENAI_API_KEY` | no | If unset, the summarize activity returns a deterministic stub |
-| `OPENAI_MODEL` | no | Defaults to `gpt-4o-mini` |
+| `TEMPORAL_AGENTS_TASK_QUEUE` | no | Defaults to `showcase-agents` |
+| `OPENAI_API_KEY` | for agents | Required by `agent-worker`. Also enables live `summarizeFindings`; otherwise that activity stubs |
+| `OPENAI_MODEL` | no | Defaults to `gpt-4o-mini` (summarize activity) |
 
 Do not commit `.env` or secrets.
+
+## Temporal Agents (OpenAI Agents SDK)
+
+Temporal does **not** run your agent code inside Cloud. A durable agent is a **Workflow**: the agent loop / tool selection stays in the Workflow; each **model call** and I/O **tool** runs as a retryable **Activity** on a Worker you operate. This repo follows the official TypeScript integration:
+[OpenAI Agents SDK + Temporal](https://docs.temporal.io/develop/typescript/integrations/openai-agents).
+
+### What you configure in Temporal Cloud
+
+1. Open the namespace → create an **API key** (Settings / API Keys) with access to `quickstart-abhishek-b8746e8b.jftpi`.
+2. Copy the region **API-key gRPC endpoint** (Namespace → Endpoints) into `TEMPORAL_ADDRESS`.
+3. Put the key in `TEMPORAL_API_KEY` (local `.env` only).
+4. There is no Cloud form that deploys agent code for you — you run `npm run agent-worker` locally (or on your infra).
+5. Configure your **model provider** on that Worker: set `OPENAI_API_KEY` for the default `OpenAIProvider`. Credentials stay on the Worker; do not put them in Workflow input.
+
+### Create / run the first agent
+
+Terminal 1 — agent Worker (must stay running):
+
+```bash
+npm run agent-worker
+```
+
+Terminal 2 — start `durableTemporalAgent`:
+
+```bash
+npm run start-agent -- --prompt "What is a Temporal Activity? Also tell me our Cloud Agents UI URL."
+```
+
+Optional: `--id my-agent-run-1` to pick the Workflow Id.
+
+The Workflow uses `TemporalOpenAIRunner` with two Activity tools:
+
+- `lookupTemporalConcept` — curated Temporal concept summary + docs link
+- `getShowcaseNamespaceInfo` — namespace, agents task queue, Cloud Agents UI URL
+
+### View it in the Cloud UI
+
+1. Agents page for this namespace:
+   https://cloud.temporal.io/namespaces/quickstart-abhishek-b8746e8b.jftpi/agents
+2. Or **Workflows** → filter by Workflow Type `durableTemporalAgent` or by the Workflow Id printed by `start-agent`.
+3. Open the run → **History** to see Workflow tasks, model Activities (via the plugin), and tool Activity completions. That history is how the agent survives Worker restarts.
+
+Docs hub: [Durable AI](https://docs.temporal.io/ai).
 
 ## Run the worker
 
@@ -206,6 +255,11 @@ src/
   start-worker-demo.ts  # CLI: start workerHandoffWorkflow
   signal-approve.ts     # CLI to send the approve signal
   shared.ts             # Cloud connection helpers
+  agents/
+    activities.ts       # lookupTemporalConcept + getShowcaseNamespaceInfo tools
+    workflows.ts        # durableTemporalAgent (TemporalOpenAIRunner)
+    worker.ts           # OpenAIAgentsPlugin worker on showcase-agents
+    client.ts           # CLI: start durableTemporalAgent
   mcp/server.ts         # MCP stdio server
 ```
 
