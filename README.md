@@ -42,7 +42,7 @@ npm install
 | `TEMPORAL_AGENTS_TASK_QUEUE` | no | Defaults to `showcase-agents` |
 | `GEMINI_API_KEY` | for agents | Required by `agent-worker`. Prefer this name; `GOOGLE_API_KEY` is an accepted alias |
 | `GOOGLE_API_KEY` | alias | Same Google AI Studio key if you already export this name |
-| `GEMINI_MODEL` | no | Defaults to `gemini-2.5-flash` |
+| `GEMINI_MODEL` | no | Defaults to `gemini-3.8-flash` (Gemini 3.8 Flash) |
 
 Do not commit `.env` or secrets.
 
@@ -77,7 +77,7 @@ npm run start-agent -- --prompt "What is a Temporal Activity? Also tell me our C
 
 Optional: `--id my-agent-run-1` to pick the Workflow Id.
 
-The Workflow uses `TemporalOpenAIRunner` with Gemini (`gemini-2.5-flash` by default) and two Activity tools:
+The Workflow uses `TemporalOpenAIRunner` with Gemini 3.8 Flash (`gemini-3.8-flash` by default; [model docs](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash)) and two Activity tools:
 
 - `lookupTemporalConcept` — curated Temporal concept summary + docs link
 - `getShowcaseNamespaceInfo` — namespace, agents task queue, Cloud Agents UI URL
@@ -260,6 +260,7 @@ src/
   shared.ts             # Cloud connection helpers
   agents/
     activities.ts       # lookupTemporalConcept + getShowcaseNamespaceInfo tools
+    model.ts            # DEFAULT_GEMINI_MODEL = gemini-3.8-flash
     gemini.ts           # GEMINI_API_KEY helper + OpenAIProvider → Gemini
     workflows.ts        # durableTemporalAgent (TemporalOpenAIRunner + Gemini)
     worker.ts           # OpenAIAgentsPlugin worker on showcase-agents
