@@ -9,6 +9,7 @@ A small TypeScript demo for colleagues covering:
 - Signals & queries
 - A **durable Temporal Agent** via `@temporalio/openai-agents` with **Gemini** as the model provider
 - A lightweight summarize activity (Gemini or stub) — not a full agent loop
+- A **unified colleague showcase** (`colleagueShowcaseWorkflow`) that combines the above with **deterministic business rules** (risk, approval, agent gating, SLA escalation)
 - An MCP server (stdio) that lists / describes / starts demo workflows
 
 **Target namespace:** `quickstart-abhishek-b8746e8b.jftpi`
@@ -140,6 +141,7 @@ The stdio MCP server exposes:
 | `list_recent_workflows` | List recent executions in the Cloud namespace |
 | `describe_workflow` | Describe a run by `workflowId` (+ optional `runId`) |
 | `start_demo_workflow` | Start `agentResearchWorkflow` on `showcase` |
+| `start_colleague_showcase` | Start `colleagueShowcaseWorkflow` (rules + optional Gemini child) |
 
 Run manually:
 
@@ -247,25 +249,91 @@ Optional flags for `npm run start-worker-demo`:
 | `--poll` | off | Print query progress while waiting |
 | `--id <workflowId>` | auto | Override workflow id |
 
+## Colleague showcase (unified demo)
+
+`colleagueShowcaseWorkflow` is the demo-worthy path for walking colleagues through
+Temporal end-to-end: identity, retries, timers, signals/queries, **deterministic
+business rules**, a Gemini child agent, and a finalize step that cites rule outcomes.
+
+### What the business rules do (workflow code — not the LLM)
+
+| Rule | Behavior |
+| --- | --- |
+| **Risk scoring** | Scores the research brief text → `low` / `medium` / `high` from keyword hits (e.g. production/security/pii → high). |
+| **Approval policy** | `low` → auto-approve. `medium` / `high` → wait for `approve` signal. Timeout → **rejected** path (no agent). |
+| **SLA / escalation** | If approval wait exceeds `--approval-sla-ms`, an `escalateApproval` activity runs (visible in history), then waiting continues until the full timeout. |
+| **Agent gating** | Start **at most one** `durableTemporalAgent` child on `showcase-agents` when risk is medium/high **or** the topic needs an agent (agent/gemini/llm/…). `--skip-agent` forces the skip branch. |
+| **Compensation / skip branches** | Rejected and skipped paths call `recordBranchPath` so history shows the alternate branch, not only the happy path. |
+
+Rules live in `src/rules/colleague-showcase.ts` (pure functions, replay-safe).
+
+### Run both workers
+
+You need **two** workers for the full path (parent + Gemini child):
+
+```bash
+# Terminal 1 — parent workflows / activities on `showcase`
+npm run worker
+
+# Terminal 2 — durableTemporalAgent on `showcase-agents` (needs GEMINI_API_KEY)
+npm run agent-worker
+```
+
+### Demo script for colleagues
+
+```bash
+# A) Low risk → auto-approve, agent usually skipped (no human signal)
+npm run start-colleague-showcase -- --demo-low --wait --poll
+
+# B) High risk → approval + Gemini child (auto-approve for a hands-free run)
+npm run start-colleague-showcase -- --demo-high --auto-approve --poll
+
+# C) Medium risk, show SLA escalation then approve (short timers)
+npm run start-colleague-showcase -- --demo-medium \
+  --approval-sla-ms 5000 --approval-timeout-ms 120000 --poll
+# In another shell, after you see ESCALATED in --poll (or worker logs):
+#   npx tsx src/signal-approve.ts <workflowId>
+
+# D) Force skip agent even when rules would run it
+npm run start-colleague-showcase -- --demo-high --skip-agent --auto-approve --wait
+
+# E) Topic that needs an agent even if risk stays lower
+npm run start-colleague-showcase -- --demo-agent --auto-approve --poll
+
+# F) Approval timeout → rejected + compensation branch (no agent)
+npm run start-colleague-showcase -- --demo-high \
+  --approval-sla-ms 3000 --approval-timeout-ms 8000 --wait --poll
+```
+
+Useful flags: `--topic`, `--skip-agent`, `--auto-approve`, `--wait`, `--poll`,
+`--approval-timeout-ms`, `--approval-sla-ms`, `--agents-queue`, `--id`, `--help`.
+
+Watch the Cloud UI history for: `reportWorkerIdentity`, `researchTopic`, timer,
+`recordBranchPath`, optional `escalateApproval`, child `durableTemporalAgent`,
+and `summarizeColleagueShowcase`.
+
 ## Project layout
 
 ```
 src/
-  activities.ts         # research + summarize + reportWorkerIdentity
-  workflows.ts          # agentResearchWorkflow + workerHandoffWorkflow
-  worker.ts             # polls TEMPORAL_TASK_QUEUE (logs host/pid/label)
-  client.ts             # CLI: start agentResearchWorkflow
-  start-worker-demo.ts  # CLI: start workerHandoffWorkflow
-  signal-approve.ts     # CLI to send the approve signal
-  shared.ts             # Cloud connection helpers
+  activities.ts                    # research + summarize + identity + showcase helpers
+  workflows.ts                     # re-exports all showcase workflows
+  colleague-showcase-workflow.ts   # colleagueShowcaseWorkflow (unified demo)
+  rules/colleague-showcase.ts      # deterministic risk / approval / agent rules
+  worker.ts                        # polls TEMPORAL_TASK_QUEUE (logs host/pid/label)
+  client.ts                        # CLI: start agentResearchWorkflow
+  start-worker-demo.ts             # CLI: start workerHandoffWorkflow
+  start-colleague-showcase.ts      # CLI: start colleagueShowcaseWorkflow
+  signal-approve.ts                # CLI to send the approve signal
+  shared.ts                        # Cloud connection helpers
   agents/
-    activities.ts       # lookupTemporalConcept + getShowcaseNamespaceInfo tools
-    model.ts            # DEFAULT_GEMINI_MODEL = gemini-3.8-flash
-    gemini.ts           # GEMINI_API_KEY helper + OpenAIProvider → Gemini
-    workflows.ts        # durableTemporalAgent (TemporalOpenAIRunner + Gemini)
-    worker.ts           # OpenAIAgentsPlugin worker on showcase-agents
-    client.ts           # CLI: start durableTemporalAgent
-  mcp/server.ts         # MCP stdio server
+    activities.ts                  # lookupTemporalConcept + getShowcaseNamespaceInfo tools
+    model.ts                       # DEFAULT_GEMINI_MODEL = gemini-3.8-flash
+    gemini.ts                      # GEMINI_API_KEY helper + OpenAIProvider → Gemini
+    workflows.ts                   # durableTemporalAgent (TemporalOpenAIRunner + Gemini)
+    worker.ts                      # OpenAIAgentsPlugin worker on showcase-agents
+    client.ts                      # CLI: start durableTemporalAgent
+  mcp/server.ts                    # MCP stdio server
 ```
 
 

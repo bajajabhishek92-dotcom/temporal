@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { TASK_QUEUE, temporalCloudConfig } from '../shared';
 import {
   agentResearchWorkflow,
+  colleagueShowcaseWorkflow,
+  type ColleagueShowcaseInput,
   type DemoWorkflowInput,
 } from '../workflows';
 
@@ -183,6 +185,68 @@ function createServer(): McpServer {
             note: requireApproval
               ? 'Workflow will pause for an approve signal after research. Use the CLI signal helper or Temporal UI.'
               : 'Workflow will complete without an approve signal (worker must be running).',
+          };
+        });
+        return textResult(started);
+      } catch (err) {
+        return textResult(
+          { error: err instanceof Error ? err.message : String(err) },
+          true,
+        );
+      }
+    },
+  );
+
+  addTool(
+    server,
+    'start_colleague_showcase',
+    'Start colleagueShowcaseWorkflow (rules + optional Gemini child on showcase-agents)',
+    {
+      topic: z
+        .string()
+        .optional()
+        .describe('Research topic that drives deterministic risk scoring'),
+      skipAgent: z
+        .boolean()
+        .optional()
+        .describe('Force-skip durableTemporalAgent child'),
+      approvalTimeoutMs: z.number().int().optional(),
+      approvalSlaMs: z.number().int().optional(),
+      workflowId: z.string().optional(),
+    },
+    async (args) => {
+      const topic =
+        typeof args.topic === 'string'
+          ? args.topic
+          : 'Temporal Cloud durable Gemini agents';
+      const skipAgent = typeof args.skipAgent === 'boolean' ? args.skipAgent : false;
+      const approvalTimeoutMs =
+        typeof args.approvalTimeoutMs === 'number' ? args.approvalTimeoutMs : undefined;
+      const approvalSlaMs =
+        typeof args.approvalSlaMs === 'number' ? args.approvalSlaMs : undefined;
+      const workflowId =
+        typeof args.workflowId === 'string' ? args.workflowId : undefined;
+      try {
+        const started = await withClient(async (client) => {
+          const id = workflowId ?? `colleague-showcase-mcp-${Date.now()}`;
+          const input: ColleagueShowcaseInput = {
+            topic,
+            skipAgent,
+            approvalTimeoutMs,
+            approvalSlaMs,
+          };
+          const handle = await client.workflow.start(colleagueShowcaseWorkflow, {
+            taskQueue: TASK_QUEUE,
+            workflowId: id,
+            args: [input],
+          });
+          return {
+            workflowId: handle.workflowId,
+            runId: handle.firstExecutionRunId,
+            taskQueue: TASK_QUEUE,
+            input,
+            note:
+              'Needs npm run worker + npm run agent-worker. Medium/high risk waits for approve signal unless low-risk topic.',
           };
         });
         return textResult(started);
