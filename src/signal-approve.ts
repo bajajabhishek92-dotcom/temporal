@@ -14,6 +14,7 @@ async function run(): Promise<void> {
   const client = new Client({ connection, namespace });
   const handle = client.workflow.getHandle(workflowId);
 
+  // Both agentResearchWorkflow and colleagueShowcaseWorkflow handle "getStatus" / "approve".
   const before = await handle.query(getStatusQuery);
   console.log('Status before approve:', before);
 

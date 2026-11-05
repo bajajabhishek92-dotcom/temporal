@@ -11,6 +11,7 @@
     "start-workflow": "tsx src/client.ts",
     "start-agent": "tsx src/agents/client.ts",
     "start-worker-demo": "tsx src/start-worker-demo.ts",
+    "start-colleague-showcase": "tsx src/start-colleague-showcase.ts",
     "signal-approve": "tsx src/signal-approve.ts",
     "mcp": "tsx src/mcp/server.ts",
     "lint": "tsc --noEmit"

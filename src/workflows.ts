@@ -8,6 +8,17 @@ import {
 } from '@temporalio/workflow';
 import type * as activities from './activities';
 
+export {
+  colleagueShowcaseWorkflow,
+  colleagueApproveSignal,
+  colleagueGetStatusQuery,
+  DEFAULT_AGENTS_TASK_QUEUE,
+  type ColleagueShowcaseInput,
+  type ColleagueShowcaseResult,
+  type ColleagueShowcaseStatus,
+  type ColleaguePhase,
+} from './colleague-showcase-workflow';
+
 const { researchTopic, summarizeFindings } = proxyActivities<typeof activities>({
   startToCloseTimeout: '2 minutes',
   retry: {
